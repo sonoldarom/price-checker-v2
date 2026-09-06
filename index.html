@@ -35,14 +35,13 @@
       font-weight: bold;
     }
     /* 16px חובה כדי למנוע Auto-Zoom באייפון */
-    input, textarea, select {
+    input, textarea {
       width: 100%;
       padding: 10px;
       font-size: 16px;
       border: 1px solid #ccc;
       border-radius: 4px;
       box-sizing: border-box;
-      background-color: white;
     }
     textarea {
       resize: vertical;
@@ -86,14 +85,39 @@
       justify-content: space-between;
       align-items: center;
     }
+    .months-box {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 10px;
+      background: white;
+    }
+    .month-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      font-size: 16px;
+    }
+    .month-item input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+    .select-all-row {
+      border-bottom: 1px solid #eee;
+      margin-bottom: 6px;
+      padding-bottom: 8px;
+      font-weight: bold;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 20px;
+      font-size: 14px;
     }
     th, td {
       border: 1px solid #ddd;
-      padding: 10px;
+      padding: 8px;
       text-align: center;
     }
     th {
@@ -109,6 +133,14 @@
     }
     .found {
       color: #28a745;
+      font-weight: bold;
+    }
+    .month-badge {
+      display: inline-block;
+      background: #e7f0fb;
+      color: #0056b3;
+      border-radius: 4px;
+      padding: 2px 8px;
       font-weight: bold;
     }
   </style>
@@ -141,8 +173,8 @@
       <div id="searchError" class="error hidden"></div>
 
       <div class="form-group">
-        <label for="monthSelect">מחירון (חודש):</label>
-        <select id="monthSelect"></select>
+        <label>מחירונים (ניתן לבחור אחד, כמה, או הכל):</label>
+        <div id="monthsBox" class="months-box">טוען...</div>
       </div>
 
       <div class="form-group">
@@ -158,6 +190,7 @@
   <script>
     // כתובת ה-Web App של Apps Script (הפרויקט הנפרד)
     const EXEC_URL = 'https://script.google.com/macros/s/AKfycbyf-JecNS9ZyReWG3_x8G6yFib-gcYRbs0GaSTQmfmQG30ILKH2tcJ-1IpnSDmM6cdI7A/exec';
+    const SHEET_PREFIX = 'מחירים';
 
     // שליחת בקשה ל-Apps Script דרך GET (עוקף CORS, בניגוד ל-POST)
     async function callApi(params) {
@@ -174,6 +207,17 @@
       return res.json();
     }
 
+    // הופך "מחירים 8.26" ל-"8.26", ו"מחירים" (בלי המשך) ל-"נוכחי"
+    function sheetLabel(name) {
+      const trimmed = String(name || '').trim();
+      if (trimmed === SHEET_PREFIX) return 'נוכחי';
+      if (trimmed.indexOf(SHEET_PREFIX) === 0) {
+        const rest = trimmed.substring(SHEET_PREFIX.length).trim();
+        return rest.length > 0 ? rest : 'נוכחי';
+      }
+      return trimmed;
+    }
+
     window.onload = function() {
       const savedUser = sessionStorage.getItem('username');
       const savedPass = sessionStorage.getItem('password');
@@ -185,24 +229,51 @@
     };
 
     async function loadMonths() {
-      const select = document.getElementById('monthSelect');
-      select.innerHTML = '<option>טוען...</option>';
+      const box = document.getElementById('monthsBox');
+      box.innerHTML = 'טוען...';
       try {
         const response = await callApi({ action: 'months' });
-        select.innerHTML = '';
-        if (response.ok && response.months && response.months.length > 0) {
-          response.months.forEach(function (name) {
-            const opt = document.createElement('option');
-            opt.value = name;
-            opt.textContent = name;
-            select.appendChild(opt);
-          });
-        } else {
-          select.innerHTML = '<option value="מחירים">מחירים</option>';
-        }
+        const months = (response.ok && response.months) ? response.months : [SHEET_PREFIX];
+
+        let html = `
+          <div class="month-item select-all-row">
+            <input type="checkbox" id="selectAllMonths" checked onchange="toggleAllMonths()">
+            <label for="selectAllMonths" style="margin:0;">בחר הכל</label>
+          </div>
+        `;
+        months.forEach(function (name, idx) {
+          const id = 'month_' + idx;
+          html += `
+            <div class="month-item">
+              <input type="checkbox" class="monthCheckbox" id="${id}" value="${name}" checked>
+              <label for="${id}" style="margin:0;">${sheetLabel(name)}</label>
+            </div>
+          `;
+        });
+        box.innerHTML = html;
       } catch (err) {
-        select.innerHTML = '<option value="מחירים">מחירים</option>';
+        box.innerHTML = `
+          <div class="month-item">
+            <input type="checkbox" class="monthCheckbox" value="${SHEET_PREFIX}" checked>
+            <label style="margin:0;">נוכחי</label>
+          </div>
+        `;
       }
+    }
+
+    function toggleAllMonths() {
+      const selectAll = document.getElementById('selectAllMonths').checked;
+      document.querySelectorAll('.monthCheckbox').forEach(function (cb) {
+        cb.checked = selectAll;
+      });
+    }
+
+    function getSelectedMonths() {
+      const checked = [];
+      document.querySelectorAll('.monthCheckbox').forEach(function (cb) {
+        if (cb.checked) checked.push(cb.value);
+      });
+      return checked;
     }
 
     async function handleLogin() {
@@ -252,7 +323,7 @@
       document.getElementById('username').value = '';
       document.getElementById('password').value = '';
       document.getElementById('customersInput').value = '';
-      document.getElementById('monthSelect').innerHTML = '';
+      document.getElementById('monthsBox').innerHTML = '';
       document.getElementById('searchSection').classList.add('hidden');
       document.getElementById('loginSection').classList.remove('hidden');
       document.getElementById('resultsContainer').innerHTML = '';
@@ -262,7 +333,7 @@
       const user = sessionStorage.getItem('username');
       const pass = sessionStorage.getItem('password');
       const rawInput = document.getElementById('customersInput').value;
-      const selectedSheet = document.getElementById('monthSelect').value;
+      const selectedMonths = getSelectedMonths();
       const errorDiv = document.getElementById('searchError');
       const btn = document.getElementById('searchBtn');
 
@@ -270,6 +341,11 @@
 
       if (customerNumbers.length === 0) {
         errorDiv.innerText = 'יש להזין לפחות מספר לקוח אחד.';
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+      if (selectedMonths.length === 0) {
+        errorDiv.innerText = 'יש לבחור לפחות מחירון אחד.';
         errorDiv.classList.remove('hidden');
         return;
       }
@@ -284,7 +360,7 @@
           username: user,
           password: pass,
           customers: customerNumbers.join(','),
-          sheet: selectedSheet
+          sheets: selectedMonths.join(',')
         });
 
         if (!response.ok) {
@@ -314,6 +390,7 @@
           <thead>
             <tr>
               <th>מספר לקוח</th>
+              <th>מחירון</th>
               <th>סטטוס</th>
               <th>מחיר חוץ</th>
               <th>מחיר דלקנים</th>
@@ -328,6 +405,7 @@
         html += `
           <tr>
             <td><strong>${item.customer}</strong></td>
+            <td><span class="month-badge">${item.label || ''}</span></td>
             <td class="${statusClass}">${statusText}</td>
             <td>${item.outsidePrice || '-'}</td>
             <td>${item.fuelPrice || '-'}</td>
