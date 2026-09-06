@@ -281,17 +281,19 @@
             <input type="checkbox" id="selectAllMonths" onchange="toggleAllMonths()">
             <label for="selectAllMonths" style="margin:0;">בחר הכל</label>
           </div>
+          <div class="months-row">
         `;
         months.forEach(function (name, idx) {
           const id = 'month_' + idx;
           const isLatest = idx === 0; // ברירת מחדל: רק החודש האחרון מסומן
           html += `
-            <div class="month-item">
+            <label class="month-chip" for="${id}">
               <input type="checkbox" class="monthCheckbox" id="${id}" value="${name}" ${isLatest ? 'checked' : ''}>
-              <label for="${id}" style="margin:0;">${sheetLabel(name)}</label>
-            </div>
+              ${sheetLabel(name)}
+            </label>
           `;
         });
+        html += `</div>`;
         box.innerHTML = html;
       } catch (err) {
         box.innerHTML = `
