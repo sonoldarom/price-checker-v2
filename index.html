@@ -94,25 +94,30 @@
     .months-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 6px;
       margin-top: 8px;
     }
     .month-chip {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
       border: 1px solid #ccc;
-      border-radius: 20px;
-      padding: 6px 12px;
-      font-size: 16px;
+      border-radius: 16px;
+      padding: 5px 12px;
+      font-size: 15px;
       background: #f4f7f6;
+      color: #333;
       cursor: pointer;
+      user-select: none;
+      transition: background-color 0.15s, color 0.15s, border-color 0.15s;
     }
     .month-chip input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      margin: 0;
-      flex-shrink: 0;
+      display: none;
+    }
+    .month-chip:has(input:checked) {
+      background: #0056b3;
+      color: #fff;
+      border-color: #0056b3;
+      font-weight: bold;
     }
     .month-item {
       display: flex;
