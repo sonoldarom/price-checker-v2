@@ -91,6 +91,29 @@
       padding: 10px;
       background: white;
     }
+    .months-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .month-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid #ccc;
+      border-radius: 20px;
+      padding: 6px 12px;
+      font-size: 16px;
+      background: #f4f7f6;
+      cursor: pointer;
+    }
+    .month-chip input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      flex-shrink: 0;
+    }
     .month-item {
       display: flex;
       align-items: center;
@@ -228,24 +251,43 @@
       }
     };
 
+    // הופך תווית כמו "8.26" למספר בר-השוואה (2608), כדי למיין מהחדש לישן.
+    // תוויות לא-מספריות (כמו "נוכחי") נחשבות "העדכניות ביותר"
+    function monthKey(label) {
+      const m = String(label || '').trim().match(/^(\d{1,2})\.(\d{2,4})$/);
+      if (m) {
+        let month = parseInt(m[1], 10);
+        let year = parseInt(m[2], 10);
+        if (year < 100) year += 2000;
+        return year * 100 + month;
+      }
+      return Infinity;
+    }
+
     async function loadMonths() {
       const box = document.getElementById('monthsBox');
       box.innerHTML = 'טוען...';
       try {
         const response = await callApi({ action: 'months' });
-        const months = (response.ok && response.months) ? response.months : [SHEET_PREFIX];
+        let months = (response.ok && response.months) ? response.months : [SHEET_PREFIX];
+
+        // מיון מהחדש לישן לפי התווית (8.26 לפני 7.26 וכו')
+        months = months.slice().sort(function (a, b) {
+          return monthKey(sheetLabel(b)) - monthKey(sheetLabel(a));
+        });
 
         let html = `
           <div class="month-item select-all-row">
-            <input type="checkbox" id="selectAllMonths" checked onchange="toggleAllMonths()">
+            <input type="checkbox" id="selectAllMonths" onchange="toggleAllMonths()">
             <label for="selectAllMonths" style="margin:0;">בחר הכל</label>
           </div>
         `;
         months.forEach(function (name, idx) {
           const id = 'month_' + idx;
+          const isLatest = idx === 0; // ברירת מחדל: רק החודש האחרון מסומן
           html += `
             <div class="month-item">
-              <input type="checkbox" class="monthCheckbox" id="${id}" value="${name}" checked>
+              <input type="checkbox" class="monthCheckbox" id="${id}" value="${name}" ${isLatest ? 'checked' : ''}>
               <label for="${id}" style="margin:0;">${sheetLabel(name)}</label>
             </div>
           `;
@@ -378,12 +420,26 @@
       }
     }
 
+    function compareCustomers(a, b) {
+      const na = Number(a);
+      const nb = Number(b);
+      if (!isNaN(na) && !isNaN(nb)) return na - nb;
+      return String(a).localeCompare(String(b));
+    }
+
     function renderResults(results) {
       const container = document.getElementById('resultsContainer');
       if (!results || results.length === 0) {
         container.innerHTML = '<p>לא נמצאו תוצאות.</p>';
         return;
       }
+
+      // מיון: לפי מספר לקוח עולה, ובתוך אותו לקוח - מהחודש האחרון לישן
+      results = results.slice().sort(function (a, b) {
+        const byCustomer = compareCustomers(a.customer, b.customer);
+        if (byCustomer !== 0) return byCustomer;
+        return monthKey(b.label) - monthKey(a.label);
+      });
 
       let html = `
         <table>
